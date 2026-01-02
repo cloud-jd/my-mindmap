@@ -1,28 +1,26 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import './App.css'; // CSS 파일을 불러옵니다.
+import './App.css';
 
-// 노드의 타입을 정의합니다. TypeScript의 장점이죠!
+// 노드의 타입을 정의합니다.
 interface Node {
   id: string;
   text: string;
   x: number;
   y: number;
-  parentId: string | null; // 부모 노드의 ID (루트 노드는 null)
+  parentId: string | null;
 }
 
 const App: React.FC = () => {
-  // 마인드맵 노드들의 상태를 관리합니다.
   const [nodes, setNodes] = useState<Node[]>([]);
-  // 드래그 중인 노드의 ID
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-  // 드래그 시작 시 마우스 위치와 노드의 초기 위치 차이
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  // 노드 연결을 위한 상태
   const [connectingNodeId, setConnectingNodeId] = useState<string | null>(null);
-  // 연결 선이 그려질 임시 마우스 위치
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  const mindmapRef = useRef<HTMLDivElement>(null); // 마인드맵 컨테이너 Ref
+  // ✨ 다크 모드를 위한 새로운 State 추가
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+
+  const mindmapRef = useRef<HTMLDivElement>(null);
 
   // 새 노드를 추가하는 함수
   const addNode = useCallback(() => {
@@ -30,7 +28,7 @@ const App: React.FC = () => {
     const newNode: Node = {
       id: newId,
       text: "New Node",
-      x: window.innerWidth / 2 - 50, // 화면 중앙에 배치
+      x: window.innerWidth / 2 - 50,
       y: window.innerHeight / 2 - 20,
       parentId: null,
     };
@@ -46,7 +44,7 @@ const App: React.FC = () => {
 
   // 노드 드래그 시작 핸들러
   const handleDragStart = useCallback((e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); // 이벤트 버블링 방지
+    e.stopPropagation();
     const node = nodes.find((n) => n.id === id);
     if (node) {
       setDraggingNodeId(id);
@@ -65,13 +63,13 @@ const App: React.FC = () => {
         )
       );
     }
-    setMousePos({ x: e.clientX, y: e.clientY }); // 연결선 그리기 위해 마우스 위치 추적
+    setMousePos({ x: e.clientX, y: e.clientY });
   }, [draggingNodeId, dragOffset]);
 
   // 마우스 놓기 핸들러 (드래그 종료)
   const handleMouseUp = useCallback(() => {
     setDraggingNodeId(null);
-    setConnectingNodeId(null); // 연결 드래그도 함께 종료
+    setConnectingNodeId(null);
   }, []);
 
   // 마우스 이벤트 리스너 등록 (전역적으로)
@@ -111,9 +109,8 @@ const App: React.FC = () => {
       const parent = nodes.find((n) => n.id === node.parentId);
       if (!parent) return null;
 
-      // 노드 중앙에서 중앙으로 선을 그립니다.
-      const startX = parent.x + 50; // 노드 너비의 절반
-      const startY = parent.y + 20; // 노드 높이의 절반
+      const startX = parent.x + 50;
+      const startY = parent.y + 20;
       const endX = node.x + 50;
       const endY = node.y + 20;
 
@@ -124,7 +121,7 @@ const App: React.FC = () => {
           y1={startY}
           x2={endX}
           y2={endY}
-          stroke="#555"
+          stroke="var(--connection-line-color)" // ✨ CSS 변수 사용
           strokeWidth="2"
         />
       );
@@ -132,45 +129,50 @@ const App: React.FC = () => {
   }, [nodes]);
 
   return (
-    <div ref={mindmapRef} className="mindmap-container">
+    // ✨ isDarkMode 상태에 따라 클래스 추가/제거
+    <div ref={mindmapRef} className={`mindmap-container ${isDarkMode ? 'dark-mode' : ''}`}>
       <button className="add-node-button" onClick={addNode}>
         + Add Node
       </button>
 
-      {/* SVG는 연결선을 그리는 데 사용됩니다. */}
+      {/* ✨ 다크 모드 토글 버튼 추가 */}
+      <button
+        className="dark-mode-toggle"
+        onClick={() => setIsDarkMode((prevMode) => !prevMode)}
+      >
+        {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+      </button>
+
       <svg className="connections-layer">
         {renderConnections()}
         {connectingNodeId && (
-          // 연결 중인 노드와 마우스 위치 간의 임시 연결선
           <line
             x1={nodes.find(n => n.id === connectingNodeId)!.x + 50}
             y1={nodes.find(n => n.id === connectingNodeId)!.y + 20}
             x2={mousePos.x}
             y2={mousePos.y}
-            stroke="blue"
+            stroke="var(--connection-line-active-color)" // ✨ CSS 변수 사용
             strokeWidth="2"
-            strokeDasharray="5,5" // 점선
+            strokeDasharray="5,5"
           />
         )}
       </svg>
 
-      {/* 개별 노드들을 렌더링합니다. */}
       {nodes.map((node) => (
         <div
           key={node.id}
           className={`mindmap-node ${draggingNodeId === node.id ? 'dragging' : ''}`}
           style={{ left: node.x, top: node.y }}
-          onMouseDown={(e) => handleDragStart(e, node.id)} // 노드 드래그 시작
+          onMouseDown={(e) => handleDragStart(e, node.id)}
           onDoubleClick={() => {
             const newText = prompt("Enter new node text:", node.text);
             if (newText !== null) {
               updateNodeText(node.id, newText);
             }
           }}
-          onMouseUp={(e) => handleNodeDrop(e, node.id)} // 연결 드롭
+          onMouseUp={(e) => handleNodeDrop(e, node.id)}
         >
           {node.text}
-          {/* 노드 연결 핸들러 */}
           <div
             className="connection-handle"
             onMouseDown={(e) => handleConnectStart(e, node.id)}
